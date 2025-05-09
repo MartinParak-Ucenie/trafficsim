@@ -105,7 +105,37 @@ public class Simulation {
             if (road.collidesWithObstacle(vehicle)) {
                 // If colliding with the obstacle, revert to the original position
                 vehicle.setVelocity(0);
-                // TODO: Implement better handling of obstacle collisions
+                // Try to change lanes immediately
+                int targetLane = (vehicle.getLane() == 0) ? 1 : 0;
+                boolean canChangeLane = true;
+
+                // Check if it's safe to change to the target lane
+                for (Vehicle otherVehicle : vehicles) {
+                    if (otherVehicle != vehicle && otherVehicle.getLane() == targetLane) {
+                        // Calculate the angle between the vehicles
+                        double angle1 = Math.atan2(vehicle.getY() - road.getCenterY(), vehicle.getX() - road.getCenterX());
+                        double angle2 = Math.atan2(otherVehicle.getY() - road.getCenterY(), otherVehicle.getX() - road.getCenterX());
+
+                        // Normalize angles to [0, 2*PI)
+                        angle1 = (angle1 + 2 * Math.PI) % (2 * Math.PI);
+                        angle2 = (angle2 + 2 * Math.PI) % (2 * Math.PI);
+
+                        // Calculate the angle difference
+                        double angleDiff = Math.abs(angle1 - angle2);
+                        angleDiff = Math.min(angleDiff, 2 * Math.PI - angleDiff);
+
+                        // If the vehicles are too close, don't change lanes
+                        if (angleDiff < 0.3) { // Adjust this threshold as needed
+                            canChangeLane = false;
+                            break;
+                        }
+                    }
+                }
+
+                if (canChangeLane) {
+                    vehicle.setChangingLane(true);
+                    vehicle.changeLane(targetLane, road.getInnerRadius(), road.getLaneWidth());
+                }
             }
 
             // Check if the vehicle is near the obstacle and needs to change lanes
@@ -140,7 +170,7 @@ public class Simulation {
                     vehicle.setChangingLane(true);
                     vehicle.changeLane(1, road.getInnerRadius(), road.getLaneWidth());
                 } else {
-                    // If can't change lane, slow down
+                    // If can't change lane, slow down only if we're in the same lane as the obstacle
                     vehicle.setAcceleration(-2.0);
                 }
             }
@@ -255,9 +285,12 @@ public class Simulation {
                     vehicle.setChangingLane(true);
                     vehicle.changeLane(targetLane, road.getInnerRadius(), road.getLaneWidth());
                 } else {
-                    // If can't change lane, slow down
+                    // If can't change lane, slow down only if the vehicle ahead is in the same lane
                     vehicle.setAcceleration(-2.0);
                 }
+            } else {
+                // If there's no vehicle ahead, accelerate to maximum velocity
+                vehicle.setAcceleration(defaultAcceleration);
             }
 
             // Check for collisions with other vehicles
@@ -265,7 +298,38 @@ public class Simulation {
                 if (vehicle != otherVehicle && vehicle.collidesWith(otherVehicle)) {
                     // If colliding with another vehicle, revert to the original position
                     vehicle.setVelocity(0);
-                    // TODO: Implement better handling of vehicle collisions
+
+                    // Try to change lanes to avoid the collision
+                    int targetLane = (vehicle.getLane() == 0) ? 1 : 0;
+                    boolean canChangeLane = true;
+
+                    // Check if it's safe to change to the target lane
+                    for (Vehicle thirdVehicle : vehicles) {
+                        if (thirdVehicle != vehicle && thirdVehicle != otherVehicle && thirdVehicle.getLane() == targetLane) {
+                            // Calculate the angle between the vehicles
+                            double angle1 = Math.atan2(vehicle.getY() - road.getCenterY(), vehicle.getX() - road.getCenterX());
+                            double angle2 = Math.atan2(thirdVehicle.getY() - road.getCenterY(), thirdVehicle.getX() - road.getCenterX());
+
+                            // Normalize angles to [0, 2*PI)
+                            angle1 = (angle1 + 2 * Math.PI) % (2 * Math.PI);
+                            angle2 = (angle2 + 2 * Math.PI) % (2 * Math.PI);
+
+                            // Calculate the angle difference
+                            double angleDiff = Math.abs(angle1 - angle2);
+                            angleDiff = Math.min(angleDiff, 2 * Math.PI - angleDiff);
+
+                            // If the vehicles are too close, don't change lanes
+                            if (angleDiff < 0.3) { // Adjust this threshold as needed
+                                canChangeLane = false;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (canChangeLane) {
+                        vehicle.setChangingLane(true);
+                        vehicle.changeLane(targetLane, road.getInnerRadius(), road.getLaneWidth());
+                    }
                 }
             }
         }
